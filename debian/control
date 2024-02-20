@@ -1,0 +1,12 @@
+Source: ros-rolling-rclc
+Section: misc
+Priority: optional
+Maintainer: Jan Staschulat <jan.staschulat@de.bosch.com>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-ament-cmake-gtest <!nocheck>, ros-rolling-ament-cmake-pytest <!nocheck>, ros-rolling-ament-cmake-ros, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-ament-lint-common <!nocheck>, ros-rolling-example-interfaces <!nocheck>, ros-rolling-launch-testing <!nocheck>, ros-rolling-osrf-testing-tools-cpp <!nocheck>, ros-rolling-rcl, ros-rolling-rcl-action, ros-rolling-rclcpp <!nocheck>, ros-rolling-rclcpp-action <!nocheck>, ros-rolling-rcutils, ros-rolling-rosidl-generator-c, ros-rolling-rosidl-typesupport-c, ros-rolling-std-msgs <!nocheck>, ros-rolling-test-msgs <!nocheck>, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclc
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-rcl, ros-rolling-rcl-action, ros-rolling-rcutils, ros-rolling-rosidl-generator-c, ros-rolling-ros-workspace
+Description: The ROS client library in C.
