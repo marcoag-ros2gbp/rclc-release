@@ -1,81 +1,297 @@
-# The rclc repository
-This repository provides the rclc package, which complements the [ROS Client Support Library (rcl)](https://github.com/ros2/rcl/) to make up a complete ROS 2 client library for the C programming language. That is, rclc does not add a new layer of types on top of rcl (like rclcpp and rclpy do) but only provides convenience functions that ease the programming with the rcl types. New types are introduced only for concepts that are missing in rcl, most important an Executor, Lifecycle Node and the Parameter server.
+# The rclc parameter package
 
-In detail, this repository contains four packages:
+ROS 2 parameters allow the user to create variables on a node and manipulate/read them with different ROS 2 commands. Further information about ROS 2 parameters can be found [here](https://docs.ros.org/en/rolling/Tutorials/Parameters/Understanding-ROS2-Parameters.html)
 
-- [rclc](rclc/) provides the mentioned convenience functions for creating instances of publishers, subscriptions, nodes, etc. with the corresponding [rcl types](https://github.com/ros2/rcl/tree/master/rcl/include/rcl). Furthermore, it provides the rclc Executor for C, analogously to rclcpp's [Executor class](https://github.com/ros2/rclcpp/blob/master/rclcpp/include/rclcpp/executor.hpp) for C++. A key feature compared to the rclcpp Executor is that it includes features for implementing deterministic timing behavior.
-- [rclc_lifecycle](rclc_lifecycle/) introduces an rclc Lifecycle Node, bundling an rcl Node and the [lifecycle state machine](http://design.ros2.org/articles/node_lifecycle.html) from the [rcl_lifecycle package](https://github.com/ros2/rcl/tree/master/rcl_lifecycle).
-- [rclc_examples](rclc_examples/) provides small examples for the use of the convenience functions and the rclc Executor, as well as a small example for the use of the rclc Lifecycle Node.
-- [rclc_parameter](rclc_parameter/) provides convenience functions for creating parameter server instances with full ROS2 parameters client compatibility.
+This package provides the rclc API with parameter server instances with full ROS 2 parameter client compatibility. A parameter client has not been implemented for rclc (yet).
+Ready to use code examples related to this tutorial can be found in [`rclc/rclc_examples/src/example_parameter_server.c`](../rclc_examples/src/example_parameter_server.c).
 
-Technical information on the interfaces and the usage of these packages is given in the README.md files in the corresponding subfolders.
+## Table of contents
+*   [Initialization](#initialization)
+*   [Memory requirements](#memory-requirements)
+*   [Callback](#callback)
+*   [Add a parameter](#add-a-parameter)
+*   [Delete a parameter](#delete-a-parameter)
+*   [Parameter description](#parameter-description)
+*   [Cleaning up](#cleaning-up)
 
-The quality declarations for the packages are avaiable in QUALITY_DECLARATION.md files in the corresponding subfolders.
+## Initialization
 
-## Purpose of the project
+- Default initialization:
+    ```c
+    // Parameter server object
+    rclc_parameter_server_t param_server;
+    // Initialize parameter server with default configuration
+    rcl_ret_t rc = rclc_parameter_server_init_default(&param_server, &node);
 
-The software is not ready for production use. It has neither been developed nor tested for a specific use case. However, the license conditions of the applicable Open Source licenses allow you to adapt the software to your needs. Before using it in a safety relevant setting, make sure that the software fulfills your requirements and adjust it according to any applicable safety standards (e.g. ISO 26262).
+    if (RCL_RET_OK != rc) {
+      ... // Handle error
+      return -1;
+    }
+    ```
 
-## Requirements, how to build, test and install
+- Custom options:
 
-Source your ROS2 `distribution` with `source /opt/ros/distribution/setup.bash`. This will setup the environment variable `$ROS-DISTRO`.
-Clone the repository into a ROS2 workspace (e.g. `~/ros2_ws/`) and build the packages using `colcon build` from the [Colcon Command Line Tools](https://colcon.readthedocs.io/en/released/). To test the RCLC package run `colcon test` or if you have multiple repositories in this workspace `colcon test --packages-select rclc`. For correct installation of the `rclc`-package do a `source ~/ros2_ws/install/local_setup.bash`. Then you are ready to run the examples in the `rclc_examples` package.
+  The following options can be configured:
+  - notify_changed_over_dds: Publish parameter events to other ROS 2 nodes as well.
+  - max_params: Maximum number of parameters allowed on the `rclc_parameter_server_t` object.
+  - allow_undeclared_parameters: Allows creation of parameters from external parameter clients. A new parameter will be created if a `set` operation is requested on a non-existing parameter.
+  - low_mem_mode: Reduces the memory used by the parameter server, functionality constrains are applied.  
 
-The following repositories might not be in the default ROS 2 distribution: osrf_testing_tools_cpp and test_msgs. In this case install them manually:
+    ```c
+    // Parameter server object
+    rclc_parameter_server_t param_server;
 
-```C
- sudo apt-get install ros-$ROS_DISTRO-osrf-testing-tools-cpp
- sudo apt-get install ros-$ROS_DISTRO-test-msgs
+    // Initialize parameter server options
+    const rclc_parameter_options_t options = {
+        .notify_changed_over_dds = true,
+        .max_params = 4,
+        .allow_undeclared_parameters = true,
+        .low_mem_mode = false; };
+
+    // Initialize parameter server with configured options
+    rcl_ret_t rc = rclc_parameter_server_init_with_option(&param_server, &node, &options);
+    if (RCL_RET_OK != rc) {
+      ... // Handle error
+      return -1;
+    }
+    ```
+
+- Low memory mode:
+
+    This mode ports the parameter functionality to memory constrained devices. The following constrains are applied:
+    - Request size limited to one parameter on Set, Get, Get types and Describe services.
+    - List parameter request has no prefixes enabled nor depth.
+    - Parameter description strings not allowed, `rclc_add_parameter_description` is disabled.
+
+    Memory benchmark results on `STM32F4` for 7 parameters with `RCLC_PARAMETER_MAX_STRING_LENGTH = 50` and `notify_changed_over_dds = true`:
+    - Full mode: 11736 B
+    - Low memory mode: 4160 B
+
+## Memory requirements
+
+The parameter server uses five services and an optional publisher. These need to be taken into account on the `rmw-microxrcedds` package memory configuration:
+
+```yaml
+# colcon.meta example with memory requirements to use a parameter server
+{
+    "names": {
+        "rmw_microxrcedds": {
+            "cmake-args": [
+                "-DRMW_UXRCE_MAX_NODES=1",
+                "-DRMW_UXRCE_MAX_PUBLISHERS=1",
+                "-DRMW_UXRCE_MAX_SUBSCRIPTIONS=0",
+                "-DRMW_UXRCE_MAX_SERVICES=5",
+                "-DRMW_UXRCE_MAX_CLIENTS=0"
+            ]
+        }
+    }
+}
 ```
 
-## License
+At runtime, the variable `RCLC_EXECUTOR_PARAMETER_SERVER_HANDLES` defines the necessary number of handles required by a parameter server for the rclc Executor:
 
-rclc is open-sourced under the Apache-2.0 license. See the [LICENSE](LICENSE) file for details.
+```c
+// Executor init example with the minimum RCLC executor handles required
+rclc_executor_t executor = rclc_executor_get_zero_initialized_executor();
+rc = rclc_executor_init(
+    &executor, &support.context,
+    RCLC_EXECUTOR_PARAMETER_SERVER_HANDLES, &allocator);
+```
 
-For a list of other open source components included in rclc, see the file [3rd-party-licenses.txt](3rd-party-licenses.txt).
+## Callback
 
-## Quality assurance
+When adding the parameter server to the executor, a callback could to be configured. This callback would then be executed on the following events:  
+- Parameter value change: Internal and external parameter set on existing parameters.
+- Parameter creation: External parameter set on unexisting parameter if `allow_undeclared_parameters` is set.
+- Parameter delete: External parameter delete on existing parameter.
+- The user can allow or reject this operations using the `bool` return value.
 
-*   Coding style:
-    *   The [uncrustify](https://github.com/uncrustify/uncrustify) tool is used to check the coding style.
-*   Linters:
-    *   The [cpplint](https://github.com/google/styleguide/tree/gh-pages/cpplint) tool is used to detect common flaws and problems in C/C++ code.
-    * The [cppcheck](http://cppcheck.sourceforge.net/) tool is used for code analysis.
-    *   The CMakeLists.txt is checked with [lint_cmake](https://pypi.org/project/cmakelint/) and the package.xml with [xmllint](http://xmlsoft.org/xmllint.html)
-*   Unit tests:
-    *   Unit tests based on [gtest](https://github.com/google/googletest) are located in the [rclc/test](rclc/test) folder.
+Callback parameters:
+- `old_param`: Parameter actual value, `NULL` for new parameter request.
+- `new_param`: Parameter new value, `NULL` for parameter removal request.
+- `context`: User context, configured on `rclc_executor_add_parameter_server_with_context`.
 
-## Known issues/limitations
+```c
+bool on_parameter_changed(const Parameter * old_param, const Parameter * new_param, void * context)
+{
+  (void) context;
 
-Please notice the following issues/limitations:
+  if (old_param == NULL && new_param == NULL) {
+    printf("Callback error, both parameters are NULL\n");
+    return false;
+  }
 
-*   The rclc executor is single-threaded. You cannot create nodes in multiple threads and manage the corresponding subscriptions/services/etc. by one executor.
+  if (old_param == NULL) {
+    printf("Creating new parameter %s\n", new_param->name.data);
+  } else if (new_param == NULL) {
+    printf("Deleting parameter %s\n", old_param->name.data);
+  } else {
+    printf("Parameter %s modified.", old_param->name.data);
+    switch (old_param->value.type) {
+      case RCLC_PARAMETER_BOOL:
+        printf(
+          " Old value: %d, New value: %d (bool)", old_param->value.bool_value,
+          new_param->value.bool_value);
+        break;
+      case RCLC_PARAMETER_INT:
+        printf(
+          " Old value: %ld, New value: %ld (int)", old_param->value.integer_value,
+          new_param->value.integer_value);
+        break;
+      case RCLC_PARAMETER_DOUBLE:
+        printf(
+          " Old value: %f, New value: %f (double)", old_param->value.double_value,
+          new_param->value.double_value);
+        break;
+      default:
+        break;
+    }
+    printf("\n");
+  }
 
-## Bloom Release Status of Code Repository ros2/rclc
+  return true;
+}
+```
 
-Bloom release status of the packages in [github.com/ros2/rclc/](https://github.com/ros2/rclc) for amd64 and arm64 architectures and ROS 2 distributions Foxy, Galactic, Humble and Rolling.
+Parameters modifications are disabled while the callback `on_parameter_changed` is executed, causing the following methods to return `RCLC_PARAMETER_DISABLED_ON_CALLBACK` if they are invoked:
+- rclc_add_parameter
+- rclc_delete_parameter
+- rclc_parameter_set_bool
+- rclc_parameter_set_int
+- rclc_parameter_set_double
+- rclc_set_parameter_read_only
+- rclc_add_parameter_constraint_double
+- rclc_add_parameter_constraint_integer
 
-|Package | Release | amd64 | arm64 | 
-|:--     |  :--    |  :--  |  :--  | 
-| [rclc](https://github.com/ros2/rclc/tree/master/rclc) | Foxy | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_uF64__rclc__ubuntu_focal_amd64__binary)](https://build.ros2.org/job/Fbin_uF64__rclc__ubuntu_focal_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_ubv8_uFv8__rclc__ubuntu_focal_arm64__binary)](https://build.ros2.org/job/Fbin_ubv8_uFv8__rclc__ubuntu_focal_arm64__binary/) |
-| | Humble | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rclc__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Hbin_uJ64__rclc__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_ujv8_uJv8__rclc__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Hbin_ujv8_uJv8__rclc__ubuntu_jammy_arm64__binary/) |
-| | Rolling| [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rclc__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Rbin_uJ64__rclc__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_ujv8_uJv8__rclc__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Rbin_ujv8_uJv8__rclc__ubuntu_jammy_arm64__binary/) |
-|     |     |   |   |    
-| [rclc_examples](https://github.com/ros2/rclc/tree/master/rclc_examples)  
-| | Foxy | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_uF64__rclc_examples__ubuntu_focal_amd64__binary)](https://build.ros2.org/job/Fbin_uF64__rclc_examples__ubuntu_focal_amd64__binary/)  | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_ubv8_uFv8__rclc_examples__ubuntu_focal_arm64__binary)](https://build.ros2.org/job/Fbin_ubv8_uFv8__rclc_examples__ubuntu_focal_arm64__binary/) | 
-| | Humble | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rclc_examples__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Hbin_uJ64__rclc_examples__ubuntu_jammy_amd64__binary/) |  [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_ujv8_uJv8__rclc_examples__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Hbin_ujv8_uJv8__rclc_examples__ubuntu_jammy_arm64__binary/) |
-| | Rolling| [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rclc_examples__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Rbin_uJ64__rclc_examples__ubuntu_jammy_amd64__binary/) |  [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_ujv8_uJv8__rclc_examples__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Rbin_ujv8_uJv8__rclc_examples__ubuntu_jammy_arm64__binary/) | 
-|     |     |   |   |    
-| [rclc_lifecycle](https://github.com/ros2/rclc/tree/master/rclc_lifecycle) 
-| | Foxy | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_uF64__rclc_lifecycle__ubuntu_focal_amd64__binary)](https://build.ros2.org/job/Fbin_uF64__rclc_lifecycle__ubuntu_focal_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Fbin_ubv8_uFv8__rclc_lifecycle__ubuntu_focal_arm64__binary)](https://build.ros2.org/job/Fbin_ubv8_uFv8__rclc_lifecycle__ubuntu_focal_arm64__binary/) | 
-| | Humble | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rclc_lifecycle__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Hbin_uJ64__rclc_lifecycle__ubuntu_jammy_amd64__binary/)|  [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_ujv8_uJv8__rclc_lifecycle__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Hbin_ujv8_uJv8__rclc_lifecycle__ubuntu_jammy_arm64__binary/) |
-| | Rolling | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rclc_lifecycle__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Rbin_uJ64__rclc_lifecycle__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_ujv8_uJv8__rclc_lifecycle__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Rbin_ujv8_uJv8__rclc_lifecycle__ubuntu_jammy_arm64__binary/) | 
-|     |     |   |   |    
-| [rclc_parameter](https://github.com/ros2/rclc/tree/master/rclc_parameter) 
-| | Humble | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_uJ64__rclc_parameter__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Hbin_uJ64__rclc_parameter__ubuntu_jammy_amd64__binary/) |  [![Build Status](https://build.ros2.org/buildStatus/icon?job=Hbin_ujv8_uJv8__rclc_parameter__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Hbin_ujv8_uJv8__rclc_parameter__ubuntu_jammy_arm64__binary/) |
-| | Rolling | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_uJ64__rclc_parameter__ubuntu_jammy_amd64__binary)](https://build.ros2.org/job/Rbin_uJ64__rclc_parameter__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/buildStatus/icon?job=Rbin_ujv8_uJv8__rclc_parameter__ubuntu_jammy_arm64__binary)](https://build.ros2.org/job/Rbin_ujv8_uJv8__rclc_parameter__ubuntu_jammy_arm64__binary/)
+Once the parameter server and the executor are initialized, the parameter server must be added to the executor in order to accept parameter commands from ROS 2:
+```c
+// Add parameter server to the executor including defined callback
+rc = rclc_executor_add_parameter_server(&executor, &param_server, on_parameter_changed);
+```
 
-## Code coverage
-The code coverage is tested with every commit, pull request. Results are available at [codecov](https://app.codecov.io/gh/ros2/rclc/branch/master/).
+Note that this callback is optional as its just an event information for the user. To use the parameter server without a callback:
+```c
+// Add parameter server to the executor without a callback
+rc = rclc_executor_add_parameter_server(&executor, &param_server, NULL);
+```
 
-[![codecov](https://codecov.io/gh/ros2/rclc/branch/master/graph/badge.svg?token=QzyykDh4zF)](https://codecov.io/gh/ros2/rclc)
+Configuration of the callback context:
+```c
+// Add parameter server to the executor including defined callback and a context
+rc = rclc_executor_add_parameter_server_with_context(&executor, &param_server, on_parameter_changed, &context);
+```
+
+## Add a parameter
+
+The micro-ROS parameter server supports the following parameter types:
+
+- Boolean:
+    ```c
+    const char * parameter_name = "parameter_bool";
+    bool param_value = true;
+
+    // Add parameter to the server
+    rcl_ret_t rc = rclc_add_parameter(&param_server, parameter_name, RCLC_PARAMETER_BOOL);
+
+    // Set parameter value (Triggers `on_parameter_changed` callback, if defined)
+    rc = rclc_parameter_set_bool(&param_server, parameter_name, param_value);
+
+    // Get parameter value and store it in "param_value"
+    rc = rclc_parameter_get_bool(&param_server, "param1", &param_value);
+
+    if (RCL_RET_OK != rc) {
+        ... // Handle error
+        return -1;
+    }
+    ```
+
+- Integer:
+    ```c
+    const char * parameter_name = "parameter_int";
+    int param_value = 100;
+
+    // Add parameter to the server
+    rcl_ret_t rc = rclc_add_parameter(&param_server, parameter_name, RCLC_PARAMETER_INT);
+
+    // Set parameter value
+    rc = rclc_parameter_set_int(&param_server, parameter_name, param_value);
+
+    // Get parameter value on param_value
+    rc = rclc_parameter_get_int(&param_server, parameter_name, &param_value);
+    ```
+
+- Double:
+    ```c
+    const char * parameter_name = "parameter_double";
+    double param_value = 0.15;
+
+    // Add parameter to the server
+    rcl_ret_t rc = rclc_add_parameter(&param_server, parameter_name, RCLC_PARAMETER_DOUBLE);
+
+    // Set parameter value
+    rc = rclc_parameter_set_double(&param_server, parameter_name, param_value);
+
+    // Get parameter value on param_value
+    rc = rclc_parameter_get_double(&param_server, parameter_name, &param_value);
+    ```
+
+Parameters can also be created by external clients if the `allow_undeclared_parameters` flag is set.
+The client just needs to set a value on a non-existing parameter. Then this parameter will be created if the server has still capacity and the callback allows the operation.
+
+*Max name size is controlled by the compile-time option `RCLC_PARAMETER_MAX_STRING_LENGTH`, default value is 50.*
+
+## Delete a parameter
+Parameters can be deleted by both, the parameter server and external clients:
+```c
+rclc_delete_parameter(&param_server, "param2");
+```
+
+Note that for external delete requests, the server callback will be executed, allowing the node to reject the operation.
+
+## Parameter description
+
+- Parameter description  
+    Adds a description of a parameter and its constrains, which will be returned on a describe parameter requests:
+    ```c
+    rclc_add_parameter_description(&param_server, "param2", "Second parameter", "Only even numbers");
+    ```
+
+    *The maximum string size is controlled by the compilation time option `RCLC_PARAMETER_MAX_STRING_LENGTH`, default value is 50.*
+
+- Parameter constraints  
+    Informative numeric constraints can be added to int and double parameters, returning this values on describe parameter requests:
+    - `from_value`: Start value for valid values, inclusive.
+    - `to_value`: End value for valid values, inclusive.
+    - `step`: Size of valid steps between the from and to bound.
+
+        ```c
+        int64_t int_from = 0;
+        int64_t int_to = 20;
+        uint64_t int_step = 2;
+        rclc_add_parameter_constraint_integer(&param_server, "param2", int_from, int_to, int_step);
+
+        double double_from = -0.5;
+        double double_to = 0.5;
+        double double_step = 0.01;
+        rclc_add_parameter_constraint_double(&param_server, "param3", double_from, double_to, double_step);
+        ```
+
+    *This constrains will not be applied by the parameter server, leaving values filtering to the user callback.*
+
+- Read-only parameters:  
+    The new API offers a read-only flag. This flag blocks parameter changes from external clients, but allows changes on the server side:
+    ```c
+    bool read_only = true;
+    rclc_set_parameter_read_only(&param_server, "param3", read_only);
+    ```
+
+## Cleaning up
+
+To destroy an initialized parameter server:
+
+```c
+// Delete parameter server
+rclc_parameter_server_fini(&param_server, &node);
+```
+
+This will delete any automatically created infrastructure on the agent (if possible) and deallocate used memory on the parameter server side.
