@@ -1,0 +1,12 @@
+Source: ros-rolling-rclc-examples
+Section: misc
+Priority: optional
+Maintainer: Jan Staschulat <jan.staschulat@de.bosch.com>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-ament-cmake-ros, ros-rolling-example-interfaces, ros-rolling-lifecycle-msgs, ros-rolling-rcl, ros-rolling-rclc, ros-rolling-rclc-lifecycle, ros-rolling-rclc-parameter, ros-rolling-std-msgs, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclc-examples
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-example-interfaces, ros-rolling-lifecycle-msgs, ros-rolling-rcl, ros-rolling-rclc, ros-rolling-rclc-lifecycle, ros-rolling-rclc-parameter, ros-rolling-std-msgs, ros-rolling-ros-workspace
+Description: Example of using rclc_executor
