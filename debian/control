@@ -1,0 +1,12 @@
+Source: ros-rolling-rclc-parameter
+Section: misc
+Priority: optional
+Maintainer: Antonio Cuadros <antoniocuadros@eprosima.com>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-ament-cmake-gtest <!nocheck>, ros-rolling-ament-cmake-pytest <!nocheck>, ros-rolling-ament-cmake-ros, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-ament-lint-common <!nocheck>, ros-rolling-builtin-interfaces, ros-rolling-example-interfaces <!nocheck>, ros-rolling-osrf-testing-tools-cpp <!nocheck>, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rclc, ros-rolling-rclcpp <!nocheck>, ros-rolling-rcutils, ros-rolling-rosidl-runtime-c, ros-rolling-std-msgs <!nocheck>, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-rclc-parameter
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-builtin-interfaces, ros-rolling-rcl, ros-rolling-rcl-interfaces, ros-rolling-rclc, ros-rolling-rcutils, ros-rolling-rosidl-runtime-c, ros-rolling-ros-workspace
+Description: Parameter server implementation for micro-ROS nodes

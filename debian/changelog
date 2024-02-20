@@ -1,0 +1,76 @@
+ros-rolling-rclc-parameter (6.1.0-2noble) noble; urgency=high
+
+  * Add empty set_atomically parameter service (#354)
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Thu, 15 Jun 2023 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.9-2noble) noble; urgency=high
+
+  * Added documentation (#301)
+  * Fix parameter change event (#310) (#311)
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Wed, 22 Mar 2023 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.8-2noble) noble; urgency=high
+
+  * Parameters fini memory (#253)
+  * Fix RCLC int parameter get (cherry-pick) (#272)
+  * rclc_parameter: Fix rcl return values (#270)
+  * Upgrade parameters (#274)
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Thu, 14 Apr 2022 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.7-2noble) noble; urgency=high
+
+  * no changes
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Thu, 17 Feb 2022 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.6-2noble) noble; urgency=high
+
+  * Add thread dependency to examples (Rolling) (#237) (resolves in this package only cpplint errors)
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Tue, 25 Jan 2022 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.5-2noble) noble; urgency=high
+
+  * no change
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Tue, 23 Nov 2021 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.4-2noble) noble; urgency=high
+
+  * Add rclc_parameter Quality Declaration (#144)
+  * Check all dynamic allocations in parameter server init (#169)
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Wed, 17 Nov 2021 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.3-2noble) noble; urgency=high
+
+  * Version bump
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Wed, 28 Jul 2021 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.2-2noble) noble; urgency=high
+
+  * Add test dependencies for rclc_parameter
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Mon, 26 Jul 2021 00:00:00 -0000
+
+ros-rolling-rclc-parameter (3.0.1-2noble) noble; urgency=high
+
+  * Removed shared from rclc_parameter
+  * Ensure clean message when set_parameter
+  * Added QoS entity creation API
+  * Updated CMakeLists.txt
+  * Major vesion bump was neccessary because API change in rcl_lifecycle package
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Sat, 17 Jul 2021 00:00:00 -0000
+
+ros-rolling-rclc-parameter (0.1.0-2noble) noble; urgency=high
+
+  * Initial release
+
+ -- Antonio Cuadros <antoniocuadros@eprosima.com>  Thu, 27 May 2021 00:00:00 -0000
+
+
